@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "tinydir.h"
+#include "../lib/tinydir.h"
 
 void list_dir(const char *);
 
