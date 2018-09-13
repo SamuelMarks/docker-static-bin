@@ -1,6 +1,8 @@
 #ifndef CRAPPY_SH
 #define CRAPPY_SH
 
+#define MAX_STR 509
+
 #include <unistd.h>
 #include <stdio.h>
 #include <ctype.h>
@@ -11,6 +13,8 @@ static inline void parse_cli(int, char *[], const char **, const bool **, const 
 
 static inline void usage_and_exit(const char *);
 
+static inline void resolve_env_vars(const char **);
+
 int main(int argc, char *argv[]) {
     const char *time = "", *command = "";
     const bool *verbose = false;
@@ -20,6 +24,8 @@ int main(int argc, char *argv[]) {
     // TODO: Rather than just `sleep`, implement a run-at `time` functionality
     if (strlen(time) > 0)
         usleep((int) strtol(time, (char **) NULL, 10));
+
+    resolve_env_vars(&command);
 
     return processInput(command, verbose);
 }
@@ -69,6 +75,46 @@ static inline void usage_and_exit(const char *argv0) {
                     "\n",
             argv0, argv0);
     exit(EXIT_FAILURE);
+}
+
+static inline void resolve_env_vars(const char **command) {
+    static char sbuf[MAX_STR];
+    const size_t slen = strlen(*command);
+    memset(sbuf, 0, slen);
+    size_t cur = 0;
+    size_t escaped_idx = slen + 1;
+    bool eat = false;
+    for (size_t i = 0; i < slen; i++) {
+        printf("(*command)[%02lu] \t= '%c'\t\tcharcode: %03d\t\t\t\tcur = %lu\n", i, (*command)[i], (*command)[i], cur);
+        switch ((*command)[i]) {
+            case '\\':
+                escaped_idx = i;
+                break;
+            case '$':
+                eat = escaped_idx != i - 1;
+                break;
+            case '{':
+                break;
+            case ' ':
+            case '}':
+                if (eat) {
+                    sbuf[cur+1] = '\0';
+                    printf("sbuf\t\t\t= \"%s\"\tgetenv(sbuf):\t\t\t\t\"%s\"\n", sbuf, getenv(sbuf));
+                    for(size_t j=0; j<strlen(sbuf); j++) {
+                        printf("sbuf[%02zd]\t\t= '%c'\t\tcharcode: %03d\n", j, sbuf[j], sbuf[j]);
+                    }
+                    memset(sbuf, 0, slen);
+                }
+                cur = 0;
+                eat = false;
+                break;
+            default:
+                if (cur > 0)
+                    sbuf[cur++] = *command[i];
+                break;
+        }
+    }
+    // *command = sbuf;
 }
 
 #endif /* CRAPPY_SH */
