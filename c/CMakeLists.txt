@@ -6,5 +6,7 @@ set(CMAKE_C_STANDARD 11)
 add_definitions(-Wno-implicit-function-declaration)
 
 add_executable(copy copy.c)
+add_executable(strip strip.c)
+add_executable(crappy_sh crappy_sh.c)
 add_executable(env env.c)
 add_executable(list list.c)

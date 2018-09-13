@@ -11,3 +11,5 @@ message("CMAKE_CXX_FLAGS_DEBUG is ${CMAKE_CXX_FLAGS_DEBUG}")
 message("CMAKE_CXX_FLAGS_RELEASE is ${CMAKE_CXX_FLAGS_RELEASE}")
 
 add_executable(crappy_sh crappy_sh.cc)
+
+add_executable(delme delme.cc)
