@@ -7,11 +7,15 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <time.h>
 #include "../lib/shell.c"
 
-static inline void parse_cli(int, char *[], const char **, const bool **, const char **);
+static inline void parse_cli(int, char *[], const bool **, const bool **, const char **,
+                             const char **, const char **, const char **);
 
 static inline void usage_and_exit(const char *);
+
+static inline int get_clock_val(struct tm, const char);
 
 static inline void resolve_env_vars(const char **);
 
@@ -20,37 +24,77 @@ char *repl_str(const char *, const char *, const char *);
 static inline void prepend(char *, const char *);
 
 int main(int argc, char *argv[]) {
-    const char *time = "", *command = "";
-    const bool *verbose = false;
+    const char *sleep = "", *modulos /* --time */= "", *time_unit = "", *command = "";
+    const bool *verbose = false, *env = false;
 
-    parse_cli(argc, argv, &time, &verbose, &command);
+    parse_cli(argc, argv, &verbose, &env, &sleep, &modulos /* --time */, &time_unit, &command);
 
-    // TODO: Rather than just `sleep`, implement a run-at `time` functionality
-    if (strlen(time) > 0)
-        usleep((int) strtol(time, (char **) NULL, 10));
+    for (time_t epoch;;) {
+        epoch = time(NULL);
+        struct tm timeinfo = *localtime(&epoch);
+        int mod = atoi(modulos);
+        if (!mod) mod = 10;
+        if (verbose)
+            printf("Sleeping until %d%s %% %d = %d\n", get_clock_val(timeinfo, time_unit[0]), time_unit, mod,
+                   get_clock_val(timeinfo, time_unit[0]) % mod);
+        if (get_clock_val(timeinfo, time_unit[0]) % mod == 0)
+            break;
+        else if (strlen(sleep) > 0) {
+            if (verbose)
+                printf("sleeping for %s\n", sleep);
+            usleep((useconds_t) strtol(sleep, NULL, 10));
+        }
+    }
 
     resolve_env_vars(&command);
 
     return processInput(command, verbose);
 }
 
-static inline void parse_cli(int argc, char *argv[], const char **time,
-                             const bool **verbose, const char **command) {
+static inline int get_clock_val(struct tm timeinfo, const char c) {
+    switch (c) {
+        case 'h':
+            return timeinfo.tm_hour;
+        case 'm':
+        minute:
+            return timeinfo.tm_min;
+        case 's':
+            return timeinfo.tm_sec;
+        default:
+            goto minute;
+    }
+}
+
+static inline void parse_cli(int argc, char *argv[],
+                             const bool **verbose, const bool **env, const char **sleep,
+                             const char **modulos /* --time */,
+                             const char **time_unit, const char **command) {
     char *previous = NULL;
     for (int ctr = 0; ctr < argc; ctr++) {
         if (strcmp(argv[ctr], "--version") == 0) {
-            printf("%s 0.0.3\n", argv[0]);
+            printf("%s 0.0.4\n", argv[0]);
             exit(EXIT_SUCCESS);
         } else if (strcmp(argv[ctr], "--verbose") == 0) goto verbose;
+        else if (strcmp(argv[ctr], "--env") == 0) goto env;
         if (previous != NULL && previous[0] == '-') {
             const char opt = previous[1] == '-' ? previous[2] : previous[1];
             switch (opt) {
-                case 't':
-                    *time = argv[ctr];
-                    break;
                 case 'v':
                 verbose:
                     *verbose = (const bool *) true;
+                    break;
+                case 'e':
+                env:
+                    *env = (const bool *) true;
+                    break;
+                case 's':
+                    *sleep = argv[ctr];
+                    break;
+                case 't':
+                    *modulos = argv[ctr];
+                    break;
+                case 'u':
+                    *time_unit = argv[ctr];
                     break;
                 case 'c':
                     *command = argv[ctr];
@@ -67,14 +111,18 @@ static inline void parse_cli(int argc, char *argv[], const char **time,
 }
 
 static inline void usage_and_exit(const char *argv0) {
-    fprintf(stderr, "usage: %s [-h] [--version] [-v] [-t TIME] [-c COMMAND]\n"
+    fprintf(stderr, "usage: %s [-h] [--version] [-v] [-e] [-s SLEEP] [-t TIME = 10] [-u UNIT = minute] [-c COMMAND]\n"
                     "\n"
                     "%s runs semicolon separated commands, optionally execute only at <time>.\n"
                     "\n"
                     "  -h, --help                       show this help message and exit\n"
                     "  --version                        show program's version number and exit\n"
                     "  -v, --verbose                    enables verbose output\n"
-                    "  -t TIME, --time TIME             TIME to run COMMAND\n"
+                    "  -e, --env                        expand environment variables\n"
+                    "  -s SLEEP, --sleep SLEEP          SLEEP intervals for time, passed to usleep\n"
+                    "  -t TIME, --time TIME             TIME until command can execute, -t 5 will run every 5 units"
+                    "                                   on clock, e.g.: with minutes 10:05 11:15 will both match \n"
+                    "  -u UNIT, --unit INTERVAL         UNIT to check, one of: h[our] m[inute] s[second]\n"
                     "  -c COMMAND, --command COMMAND    COMMAND(s) to run, e.g.: '/bin/ls | /bin/wc -l ; /bin/du -h ;'"
                     "\n",
             argv0, argv0);
