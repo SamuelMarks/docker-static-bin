@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.12)
-project(c C)
+project(c VERSION 0.0.5)
 
 set(CMAKE_C_STANDARD 11)
+
+configure_file(lib/version.h.in version.h @ONLY)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_definitions(-Wno-implicit-function-declaration)
 

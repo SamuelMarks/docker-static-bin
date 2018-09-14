@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <time.h>
+#include <version.h>
 #include "../lib/shell.c"
 
 static inline void parse_cli(int, char *[], const bool **, const bool **, const char **,
@@ -31,11 +32,11 @@ int main(int argc, char *argv[]) {
 
     for (time_t epoch;;) {
         epoch = time(NULL);
-        struct tm timeinfo = *localtime(&epoch);
-        int mod = atoi(modulos);
+        struct tm timeinfo = *gmtime(&epoch);
+        int mod = (int) strtol(modulos, NULL, 10);
         if (!mod) mod = 10;
         if (verbose)
-            printf("Sleeping until %d%s %% %d = %d\n", get_clock_val(timeinfo, time_unit[0]), time_unit, mod,
+            printf("Sleeping until %d%s %% %d, i.e.: %d == 0\n", get_clock_val(timeinfo, time_unit[0]), time_unit, mod,
                    get_clock_val(timeinfo, time_unit[0]) % mod);
         if (get_clock_val(timeinfo, time_unit[0]) % mod == 0)
             break;
@@ -72,7 +73,7 @@ static inline void parse_cli(int argc, char *argv[],
     char *previous = NULL;
     for (int ctr = 0; ctr < argc; ctr++) {
         if (strcmp(argv[ctr], "--version") == 0) {
-            printf("%s 0.0.4\n", argv[0]);
+            printf("%s %d.%d.%d\n", argv[0], PROJECT_VERSION_MAJOR, PROJECT_VERSION_MINOR, PROJECT_VERSION_PATCH);
             exit(EXIT_SUCCESS);
         } else if (strcmp(argv[ctr], "--verbose") == 0) goto verbose;
         else if (strcmp(argv[ctr], "--env") == 0) goto env;
