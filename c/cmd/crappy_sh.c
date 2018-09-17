@@ -16,7 +16,7 @@ static inline void parse_cli(int, char *[], const bool **, const bool **, const 
 
 static inline void usage_and_exit(const char *);
 
-static inline int get_clock_val(struct tm, const char);
+static inline int get_clock_val(struct tm, char);
 
 static inline void resolve_env_vars(const char **);
 
@@ -30,26 +30,32 @@ int main(int argc, char *argv[]) {
 
     parse_cli(argc, argv, &verbose, &env, &sleep, &modulos /* --time */, &time_unit, &command);
 
-    for (time_t epoch;;) {
-        epoch = time(NULL);
-        struct tm timeinfo = *gmtime(&epoch);
-        int mod = (int) strtol(modulos, NULL, 10);
-        if (!mod) mod = 10;
-        if (verbose)
-            printf("Sleeping until %d%s %% %d, i.e.: %d == 0\n", get_clock_val(timeinfo, time_unit[0]), time_unit, mod,
-                   get_clock_val(timeinfo, time_unit[0]) % mod);
-        if (get_clock_val(timeinfo, time_unit[0]) % mod == 0)
-            break;
-        else if (strlen(sleep) > 0) {
+    if (strlen(modulos) + strlen(time_unit) > 0)
+        for (time_t epoch;;) {
+            epoch = time(NULL);
+            struct tm timeinfo = *gmtime(&epoch);
+            int mod = (int) strtol(modulos, NULL, 10);
+            if (!mod) mod = 10;
+
+            const int clock_val = get_clock_val(timeinfo, time_unit[0]);
+
             if (verbose)
-                printf("sleeping for %s\n", sleep);
-            usleep((useconds_t) strtol(sleep, NULL, 10));
+                printf("Waiting for %d %ss %% %d to be 0, currently %d != 0\n",
+                       clock_val, time_unit, mod, clock_val % mod);
+            if (clock_val % mod == 0)
+                break;
+            else if (strlen(sleep) > 0) {
+                if (verbose)
+                    printf("Sleeping for %s\n", sleep);
+                usleep((useconds_t) strtol(sleep, NULL, 10));
+            }
         }
-    }
 
-    resolve_env_vars(&command);
+    if (env)
+        resolve_env_vars(&command);
 
-    return processInput(command, verbose);
+    if (strlen(command))
+        return processInput(command, verbose);
 }
 
 static inline int get_clock_val(struct tm timeinfo, const char c) {
@@ -107,7 +113,7 @@ static inline void parse_cli(int argc, char *argv[],
         previous = argv[ctr];
     }
 
-    if (strlen(*command) < 2)
+    if (strlen(*command) + strlen(*sleep) + strlen(*modulos) + strlen(*time_unit) < 3)
         usage_and_exit(argv[0]);
 }
 
