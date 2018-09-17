@@ -134,7 +134,7 @@ static inline void usage_and_exit(const char *argv0) {
                     "  -v, --verbose                    enables verbose output\n"
                     "  -e, --env                        expand environment variables\n"
                     "  -s SLEEP, --sleep SLEEP          SLEEP intervals for time, passed to usleep\n"
-                    "  -t TIME, --time TIME             TIME until command can execute, -t 5 will run every 5 units"
+                    "  -t TIME, --time TIME             TIME until command can execute, -t 5 will run every 5 units\n"
                     "                                   on clock, e.g.: with minutes 10:05 11:15 will both match \n"
                     "  -u UNIT, --unit INTERVAL         UNIT to check, one of: h[our] m[inute] s[second]\n"
                     "  -c COMMAND, --command COMMAND    COMMAND(s) to run, e.g.: '/bin/ls | /bin/wc -l ; /bin/du -h ;'"
@@ -144,6 +144,7 @@ static inline void usage_and_exit(const char *argv0) {
 }
 
 
+/* stolen from https://creativeandcritical.net/str-replace-c */
 char *repl_str(const char *str, const char *from, const char *to) {
     /* Adjust each of the below values to suit your needs. */
 
@@ -251,8 +252,76 @@ static inline void resolve_env_vars(const char **command) {
                 break;
             case '{':
                 break;
-            case ' ':
-            case '}':
+                /* Shell and Utilities volume of IEEE Std 1003.1-2001 as referenced in stackoverflow.com/a/2821183
+                 * with lowercase ascii characters support also...
+                 * Generated with Python `'\n'.join('case \'{}\':'.format(i) for i in string.digits + string.letters)`
+                 */
+            case '_':
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+            case 'A':
+            case 'B':
+            case 'C':
+            case 'D':
+            case 'E':
+            case 'F':
+            case 'G':
+            case 'H':
+            case 'I':
+            case 'J':
+            case 'K':
+            case 'L':
+            case 'M':
+            case 'N':
+            case 'O':
+            case 'P':
+            case 'Q':
+            case 'R':
+            case 'S':
+            case 'T':
+            case 'U':
+            case 'V':
+            case 'W':
+            case 'X':
+            case 'Y':
+            case 'Z':
+            case 'a':
+            case 'b':
+            case 'c':
+            case 'd':
+            case 'e':
+            case 'f':
+            case 'g':
+            case 'h':
+            case 'i':
+            case 'j':
+            case 'k':
+            case 'l':
+            case 'm':
+            case 'n':
+            case 'o':
+            case 'p':
+            case 'q':
+            case 'r':
+            case 's':
+            case 't':
+            case 'u':
+            case 'v':
+            case 'w':
+            case 'x':
+            case 'y':
+            case 'z':
+                if (eat) sbuf[cur++] = (*command)[i];
+                break;
+            default:
                 if (eat) {
                     sbuf[cur] = '\0';
                     const char *res = getenv(sbuf);
@@ -260,13 +329,10 @@ static inline void resolve_env_vars(const char **command) {
                         prepend(sbuf, "$");
                         *command = repl_str(*command, sbuf, res);
                     }
-                    memset(sbuf, 0, slen);
                 }
+                memset(sbuf, 0, slen);
                 cur = 0;
                 eat = false;
-                break;
-            default:
-                if (eat) sbuf[cur++] = (*command)[i];
         }
     }
 }
