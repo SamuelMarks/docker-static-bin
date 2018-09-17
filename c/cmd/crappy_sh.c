@@ -53,8 +53,13 @@ int main(int argc, char *argv[]) {
             }
         }
 
-    if (env)
+    if (env) {
+        if (verbose)
+            printf("command before expansion of environment variables:\t\"%s\"\n", command);
         resolve_env_vars(&command);
+        if (verbose)
+            printf("command after expansion of environment variables:\t\"%s\"\n", command);
+    }
 
     if (strlen(command))
         return processInput(command, verbose);
