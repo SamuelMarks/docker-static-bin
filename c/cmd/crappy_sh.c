@@ -8,6 +8,8 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <time.h>
+#include <stdint.h>
+
 #include <version.h>
 #include "../lib/shell.c"
 
