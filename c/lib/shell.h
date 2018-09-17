@@ -4,6 +4,7 @@
 // Butchered https://github.com/prakhar1989/shell
 
 #include <stdbool.h>
+#include <sys/types.h>
 
 /* Constants */
 #define ARG_MAX_COUNT    1024      /* max number of arguments to a command */
@@ -19,6 +20,12 @@ struct command {		   /* a struct that stores a parsed command */
 struct commands {                  /* struct to store a command pipeline */
 	int cmd_count;             /* number of commands in the pipeline */
 	struct command *cmds[];    /* the commands themselves */
+};
+
+typedef struct PidCode PidCode;
+struct PidCode {
+    pid_t pid;
+    int return_code;
 };
 
 /* Frees up memory for the commands */
@@ -53,24 +60,24 @@ int check_built_in(struct command *cmd);
  *
  * Returns -1 to indicate that program should exit.
  */
-int handle_built_in(struct commands *cmds, struct command *cmd);
+const PidCode handle_built_in(struct commands *cmds, struct command *cmd);
 
 /* Executes a command by forking of a child and calling exec.
  * Causes the calling progress to halt until the child is done executing.
  */
-int exec_command(struct commands *cmds, struct command *cmd, int (*pipes)[2]);
+const PidCode exec_command(struct commands *cmds, struct command *cmd, int (*pipes)[2]);
 
 /* Executes a set of commands that are piped together.
  * If it's a single command, it simply calls `exec_command`.
  */
-int exec_commands(struct commands *cmds);
+const PidCode exec_commands(struct commands *cmds);
 
-int run_cmd(const char *s);
+const PidCode run_cmd(const char *);
 
-static inline int run_command(const char *sbuf, bool verbose);
+static inline PidCode run_command(const char *sbuf, bool verbose);
 
 
 /* Process all input commands */
-int processInput(const char *in, bool verbose);
+const PidCode processInput(const char *in, bool verbose);
 
 #endif /* SHELL_H */

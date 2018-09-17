@@ -17,6 +17,8 @@ static struct command *parent_cmd;
 static struct commands *parent_cmds;
 static char *temp_line;
 
+static const PidCode pid_code_nulled = {0, 0};
+
 /* Frees up memory for the commands */
 void cleanup_commands(struct commands *cmds) {
     for (int i = 0; i < cmds->cmd_count; i++)
@@ -127,27 +129,30 @@ int check_built_in(struct command *cmd) {
  *
  * Returns -1 to indicate that program should exit.
  */
-int handle_built_in(struct commands *cmds, struct command *cmd) {
+const PidCode handle_built_in(struct commands *cmds, struct command *cmd) {
     int ret;
 
-    if (strcmp(cmd->name, "exit") == 0)
-        return -1;
+    if (strcmp(cmd->name, "exit") == 0) {
+        const PidCode pid_code = {0, -1};
+        return pid_code;
+    }
 
     if (strcmp(cmd->name, "cd") == 0) {
         ret = chdir(cmd->argv[1]);
         if (ret != 0) {
             fprintf(stderr, "error: unable to change dir\n");
-            return 1;
+            const PidCode pid_code = {0, ret};
+            return pid_code;
         }
-        return 0;
+        return pid_code_nulled;
     }
-    return 0;
+    return pid_code_nulled;
 }
 
 /* Executes a command by forking of a child and calling exec.
  * Causes the calling progress to halt until the child is done executing.
  */
-int exec_command(struct commands *cmds, struct command *cmd, int (*pipes)[2]) {
+const PidCode exec_command(struct commands *cmds, struct command *cmd, int (*pipes)[2]) {
     if (check_built_in(cmd) == 1)
         return handle_built_in(cmds, cmd);
 
@@ -155,12 +160,8 @@ int exec_command(struct commands *cmds, struct command *cmd, int (*pipes)[2]) {
 
     if (child_pid == -1) {
         fprintf(stderr, "error: fork error\n");
-        return 0;
-    }
-
-    /* in the child */
-    if (child_pid == 0) {
-
+        return pid_code_nulled;
+    } /* in the child */ else if (child_pid == 0) {
         int input_fd = cmd->fds[0];
         int output_fd = cmd->fds[1];
 
@@ -193,26 +194,28 @@ int exec_command(struct commands *cmds, struct command *cmd, int (*pipes)[2]) {
             free(parent_cmds);
         }
 
-
         /* exit from child so that the parent can handle the scenario*/
         _exit(EXIT_FAILURE);
+    } else {
+        int child_status;
+        waitpid(child_pid, &child_status, 0);
+
+        const PidCode pid_code = {child_pid, child_status};
+        return pid_code;
     }
-    /* parent continues here */
-    return child_pid;
 }
 
 /* Executes a set of commands that are piped together.
  * If it's a single command, it simply calls `exec_command`.
  */
-int exec_commands(struct commands *cmds) {
-    int exec_ret = 0;
+const PidCode exec_commands(struct commands *cmds) {
+    PidCode pid_code = {.pid = -1};
 
     /* single command? run it */
     if (cmds->cmd_count == 1) {
         cmds->cmds[0]->fds[STDIN_FILENO] = STDIN_FILENO;
         cmds->cmds[0]->fds[STDOUT_FILENO] = STDOUT_FILENO;
-        exec_ret = exec_command(cmds, cmds->cmds[0], NULL);
-        wait(NULL);
+        exec_command(cmds, cmds->cmds[0], NULL);
     } else {
         /* execute a pipeline */
         int pipe_count = cmds->cmd_count - 1;
@@ -223,9 +226,9 @@ int exec_commands(struct commands *cmds) {
         for (i = 0; i < cmds->cmd_count; i++) {
             if (check_built_in(cmds->cmds[i])) {
                 fprintf(stderr, "error: no builtins in pipe\n");
-                return 0;
+                pid_code.return_code = 0;
+                return pid_code;
             }
-
         }
 
         /* allocate an array of pipes. Each member is array[2] */
@@ -233,7 +236,8 @@ int exec_commands(struct commands *cmds) {
 
         if (pipes == NULL) {
             fprintf(stderr, "error: memory alloc error\n");
-            return 0;
+            pid_code.return_code = 0;
+            return pid_code;
         }
 
 
@@ -248,7 +252,8 @@ int exec_commands(struct commands *cmds) {
 
         /* execute the commands */
         for (i = 0; i < cmds->cmd_count; i++)
-            exec_ret = exec_command(cmds, cmds->cmds[i], pipes);
+            pid_code = exec_command(cmds, cmds->cmds[i], pipes);
+        /* only the last one matters */
 
         close_pipes(pipes, pipe_count);
 
@@ -259,15 +264,15 @@ int exec_commands(struct commands *cmds) {
         free(pipes);
     }
 
-    return exec_ret;
+    return pid_code;
 }
 
-int run_cmd(const char *s) {
-    int exec_ret = 0;
+const PidCode run_cmd(const char *s) {
+    PidCode pid_code = pid_code_nulled;
     char *input = strdup(s);
 
     if (input == NULL) {
-        return EXIT_SUCCESS;
+        return pid_code_nulled;
     }
 
     if (strlen(input) > 0 && !is_blank(input) && input[0] != '|') {
@@ -276,33 +281,29 @@ int run_cmd(const char *s) {
         struct commands *commands = parse_commands_with_pipes(input);
 
         free(linecopy);
-        exec_ret = exec_commands(commands);
+        pid_code = exec_commands(commands);
         cleanup_commands(commands);
     }
 
     free(input);
 
-    return exec_ret;
+    return pid_code;
 }
 
-static inline int run_command(const char *sbuf, const bool verbose) {
-    if (!strlen(sbuf)) return 0;
+static inline PidCode run_command(const char *sbuf, const bool verbose) {
+    if (!strlen(sbuf)) return pid_code_nulled;
     else if (verbose) {
         printf("cmd: \"%s\"\n", sbuf);
-        const int retcode = run_cmd(sbuf);
-
-        printf("$?: %d\n", retcode);
-        return retcode;
+        return run_cmd(sbuf);
     }
     return run_cmd(sbuf);
 }
 
-
 /* Process all input commands */
-int processInput(const char *in, const bool verbose) {
+const PidCode processInput(const char *in, const bool verbose) {
     const size_t slen = strlen(in);
     char sbuf[slen];
-    static int last_retcode = 0;
+    PidCode last_pid_code = pid_code_nulled;
 
     for (size_t i = 0, cur = 0; i < slen; i++) {
         switch (in[i]) {
@@ -328,7 +329,7 @@ int processInput(const char *in, const bool verbose) {
                     }
                 }
             end:
-                last_retcode = run_command(sbuf, verbose);
+                last_pid_code = run_command(sbuf, verbose);
                 cur = 0;
                 memset(sbuf, 0, slen);
                 break;
@@ -343,7 +344,10 @@ int processInput(const char *in, const bool verbose) {
         }
     }
 
-    return run_command(sbuf, verbose) || last_retcode;
+    const PidCode pid0 = run_command(sbuf, verbose);
+    if (!pid0.return_code)
+        return last_pid_code;
+    return pid0;
 }
 
 #endif /* SHELL */

@@ -62,7 +62,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (strlen(command))
-        return processInput(command, verbose);
+        return processInput(command, verbose).return_code;
 }
 
 static inline int get_clock_val(struct tm timeinfo, const char c) {
@@ -241,7 +241,7 @@ static inline void resolve_env_vars(const char **command) {
     memset(sbuf, 0, slen);
     size_t cur = 0;
     size_t escaped_idx = slen + 1;
-    bool eat = false;
+    bool eat = false, brace = false;
     for (size_t i = 0; i < slen; i++) {
         switch ((*command)[i]) {
             case '\\':
@@ -251,6 +251,7 @@ static inline void resolve_env_vars(const char **command) {
                 eat = escaped_idx != i - 1;
                 break;
             case '{':
+                brace = eat;
                 break;
                 /* Shell and Utilities volume of IEEE Std 1003.1-2001 as referenced in stackoverflow.com/a/2821183
                  * with lowercase ascii characters support also...
@@ -323,9 +324,11 @@ static inline void resolve_env_vars(const char **command) {
                 break;
             default:
                 if (eat) {
+                    if (brace) sbuf[cur++] = '}';
                     sbuf[cur] = '\0';
-                    const char *res = getenv(sbuf);
+                    const char *res = strlen(sbuf) > 1? getenv(sbuf): NULL;
                     if (res != NULL) {
+                        if (brace) prepend(sbuf, "{");
                         prepend(sbuf, "$");
                         *command = repl_str(*command, sbuf, res);
                     }
