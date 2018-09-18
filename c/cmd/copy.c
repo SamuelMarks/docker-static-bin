@@ -3,69 +3,19 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
-#include <sys/stat.h>
 
-#ifdef __APPLE__
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/uio.h>
-
-#endif
-
-#ifdef __linux__
-#include <sys/sendfile.h>
-#endif
-
-int cp(const char *, const char *);
+int cp(const char *, const char *, int);
 
 int main(int argc, char **argv) {
-    if (argv[1] == NULL || argv[2] == NULL) {
-        printf("Usage %s <source> <destination>\n", argv[0]);
+    if (argc < 3 || argv[1] == NULL || argv[2] == NULL) {
+        printf("Usage %s <source> <destination> [mode=0666]\n", argv[0]);
         exit(2);
     }
     printf("copy %s %s\n", argv[1], argv[2]);
-    cp(argv[1], argv[2]);
+    cp(argv[1], argv[2], argc > 3 && argv[3] != NULL ? (int) strtol(argv[3], NULL, 10) : 0666);
 }
 
-int cp(const char *source, const char *dest) {
-#ifdef __linux__
-    // https://stackoverflow.com/a/2180204
-    int fdSource = open(source, O_RDWR);
-
-    /* Caf's comment about race condition... */
-    if (fdSource > 0) {
-        if (lockf(fdSource, F_LOCK, 0) == -1) return 0; /* FAILURE */
-    } else return 0; /* FAILURE */
-
-    /* Now the fdSource is locked */
-
-    int fdDest = open(dest, O_CREAT);
-    off_t lCount;
-    struct stat sourceStat;
-    if (fdSource > 0 && fdDest > 0) {
-        if (!stat(source, &sourceStat)) {
-            int len = sendfile(fdDest, fdSource, &lCount, sourceStat.st_size);
-            if (len > 0 && len == sourceStat.st_size) {
-                close(fdDest);
-                close(fdSource);
-
-                /* Sanity Check for Lock, if this is locked -1 is returned! */
-                if (lockf(fdSource, F_TEST, 0) == 0) {
-                    if (lockf(fdSource, F_ULOCK, 0) == -1) {
-                        /* WHOOPS! WTF! FAILURE TO UNLOCK! */
-                    } else {
-                        return 1; /* Success */
-                    }
-                } else {
-                    /* WHOOPS! WTF! TEST LOCK IS -1 WTF! */
-                    return 0; /* FAILURE */
-                }
-            }
-        }
-    }
-    return 0; /* Failure */
-#else
+int cp(const char *source, const char *dest, int mode) {
     // https://stackoverflow.com/a/2180157
     int fd_to, fd_from;
     char buf[4096];
@@ -76,7 +26,7 @@ int cp(const char *source, const char *dest) {
     if (fd_from < 0)
         return -1;
 
-    fd_to = open(dest, O_WRONLY | O_CREAT | O_EXCL, 0666);
+    fd_to = open(dest, O_WRONLY | O_CREAT | O_EXCL, mode);
     if (fd_to < 0)
         goto out_error;
 
@@ -116,5 +66,4 @@ int cp(const char *source, const char *dest) {
 
     errno = saved_errno;
     return -1;
-#endif
 }
