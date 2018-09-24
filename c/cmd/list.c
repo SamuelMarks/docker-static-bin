@@ -1,14 +1,15 @@
 #include <stdio.h>
+#include "list.h"
 #include "../lib/tinydir.h"
 
-void list_dir(const char *);
-
-int main(int argc, char **argv) {
+int list_main(int argc, char **argv) {
     if (argv[1] == NULL) {
       printf("Usage %s <source> <destination>\n", argv[0]);
       exit(2);
     }
     list_dir(argv[1]);
+
+    return EXIT_SUCCESS;
 }
 
 void list_dir(const char *path) {

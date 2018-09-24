@@ -13,20 +13,9 @@
 #include <version.h>
 #include "../lib/shell.c"
 
-static inline void parse_cli(int, char *[], const bool **, const bool **, const char **,
-                             const char **, const char **, const char **);
+#include "crappy_sh.h"
 
-static inline void usage_and_exit(const char *);
-
-static inline int get_clock_val(struct tm, char);
-
-static inline void resolve_env_vars(const char **);
-
-char *repl_str(const char *, const char *, const char *);
-
-static inline void prepend(char *, const char *);
-
-int main(int argc, char *argv[]) {
+int crappy_sh_main(int argc, char *argv[]) {
     const char *sleep = "", *modulos /* --time */= "", *time_unit = "", *command = "";
     const bool *verbose = false, *env = false;
 
@@ -63,6 +52,8 @@ int main(int argc, char *argv[]) {
 
     if (strlen(command))
         return processInput(command, verbose).return_code;
+
+    return EXIT_SUCCESS;
 }
 
 static inline int get_clock_val(struct tm timeinfo, const char c) {

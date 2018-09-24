@@ -4,15 +4,17 @@
 #include <unistd.h>
 #include <errno.h>
 
-int cp(const char *, const char *, int);
+#include "copy.h"
 
-int main(int argc, char **argv) {
+int copy_main(int argc, char **argv) {
     if (argc < 3 || argv[1] == NULL || argv[2] == NULL) {
         printf("Usage %s <source> <destination> [mode=0666]\n", argv[0]);
         exit(2);
     }
     printf("copy %s %s\n", argv[1], argv[2]);
     cp(argv[1], argv[2], argc > 3 && argv[3] != NULL ? (int) strtol(argv[3], NULL, 10) : 0666);
+
+    return EXIT_SUCCESS;
 }
 
 int cp(const char *source, const char *dest, int mode) {
