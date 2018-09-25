@@ -2,10 +2,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "copy.h"
-#include "list.h"
-#include "env.h"
 #include "crappy_sh.h"
+#include "env.h"
+#include "list.h"
+#include "symlink.h"
 
 int main(int argc, char **argv, char **envp) {
     const size_t slen = strlen(argv[0]);
@@ -30,6 +32,8 @@ int main(int argc, char **argv, char **envp) {
         return crappy_sh_main(argc, argv);
     else if (strcmp(exec_name, "list") == 0 || strcmp(exec_name, "ls") == 0)
         return list_main(argc, argv);
+    else if (strcmp(exec_name, "symlink") == 0 || strcmp(exec_name, "ln") == 0)
+        return symlink_main(argc, argv);
 
     fprintf(stderr, "Rather than %s; use one of the symbolically linked: copy; env; crappy_sh; list\n", exec_name);
     exit(EXIT_FAILURE);

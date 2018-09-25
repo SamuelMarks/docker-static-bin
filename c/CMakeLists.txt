@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(c VERSION 0.0.11)
+project(c VERSION 0.0.12)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -11,4 +11,5 @@ add_definitions(-Wno-implicit-function-declaration)
 if (NOT APPLE)
     add_definitions('-static')
 endif ()
-add_executable(main cmd/main.c cmd/copy.c cmd/crappy_sh.c cmd/env.c cmd/list.c)
+
+add_executable(main cmd/main.c cmd/copy.c cmd/crappy_sh.c cmd/env.c cmd/list.c cmd/symlink.c)
