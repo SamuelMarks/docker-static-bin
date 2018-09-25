@@ -2,6 +2,7 @@
 #define C_CRAPPY_SH_H
 
 #include <stdbool.h>
+#include <time.h>
 
 static inline void parse_cli(int, char *[], const bool **, const bool **, const char **,
                              const char **, const char **, const char **);
