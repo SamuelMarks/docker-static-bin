@@ -4,7 +4,7 @@
 
 int list_main(int argc, char **argv) {
     if (argv[1] == NULL) {
-      printf("Usage %s <source> <destination>\n", argv[0]);
+      printf("Usage %s <location>\n", argv[0]);
       exit(2);
     }
     list_dir(argv[1]);
@@ -21,9 +21,8 @@ void list_dir(const char *path) {
         tinydir_readfile(&dir, &file);
 
         printf("%s", file.name);
-        if (file.is_dir) {
+        if (file.is_dir)
             printf("/");
-        }
         printf("\n");
 
         tinydir_next(&dir);
