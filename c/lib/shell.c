@@ -271,9 +271,8 @@ const PidCode run_cmd(const char *s) {
     PidCode pid_code = pid_code_nulled;
     char *input = strdup(s);
 
-    if (input == NULL) {
+    if (input == NULL || !strlen(input))
         return pid_code_nulled;
-    }
 
     if (strlen(input) > 0 && !is_blank(input) && input[0] != '|') {
         char *linecopy = strdup(input);

@@ -22,6 +22,8 @@ static inline int get_clock_val(struct tm, char);
 
 static inline void resolve_env_vars(const char **);
 
+static inline bool has_env_var(const char **);
+
 char *repl_str(const char *, const char *, const char *);
 
 static inline void prepend(char *, const char *);
@@ -56,7 +58,10 @@ int main(int argc, char *argv[]) {
     if (env) {
         if (verbose)
             printf("command before expansion of environment variables:\t\"%s\"\n", command);
-        resolve_env_vars(&command);
+
+        do resolve_env_vars(&command);
+        while (has_env_var(&command));
+
         if (verbose)
             printf("command after expansion of environment variables:\t\"%s\"\n", command);
     }
@@ -326,7 +331,7 @@ static inline void resolve_env_vars(const char **command) {
                 if (eat) {
                     if (brace) sbuf[cur++] = '}';
                     sbuf[cur] = '\0';
-                    const char *res = strlen(sbuf) > 1? getenv(sbuf): NULL;
+                    const char *res = strlen(sbuf) > 1 ? getenv(sbuf) : NULL;
                     if (res != NULL) {
                         if (brace) prepend(sbuf, "{");
                         prepend(sbuf, "$");
@@ -338,6 +343,23 @@ static inline void resolve_env_vars(const char **command) {
                 eat = false;
         }
     }
+}
+
+static inline bool has_env_var(const char **command) {
+    const size_t slen = strlen(*command);
+    size_t escaped_idx = slen + 1;
+    for (size_t i = 0; i < slen; i++)
+        switch ((*command)[i]) {
+            case '\\':
+                escaped_idx = i;
+                break;
+            case '$':
+                if (escaped_idx != i - 1)
+                    return true;
+            default:
+                break;
+        }
+    return false;
 }
 
 #endif /* CRAPPY_SH */
