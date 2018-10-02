@@ -78,6 +78,6 @@ static inline PidCode run_command(const char *sbuf, bool verbose);
 
 
 /* Process all input commands */
-const PidCode processInput(const char *in, bool verbose);
+const PidCode processInput(const char *, bool);
 
 #endif /* SHELL_H */

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0)
-project(docker_static_bin VERSION 0.0.10)
+project(docker_static_bin VERSION 0.0.11)
 
 set(CMAKE_C_STANDARD 11)
 
@@ -28,7 +28,7 @@ if (TEST_ENABLED)
 
         file(GLOB files "test/test_*.c")
         foreach (file ${files})
-            get_filename_component(file_without_ext file NAME_WE CACHE INTERNAL)
+            get_filename_component(file_without_ext ${file} NAME_WE CACHE INTERNAL)
             add_executable(${file_without_ext} ${file})
             add_test(${file_without_ext} ${file_without_ext})
             target_link_libraries(${file_without_ext} cmocka)

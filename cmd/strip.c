@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     char *strip_s = strdup(s);
     trim(&strip_s);
     printf("s = \"%s\"; strip_s = \"%s\"\n", s, strip_s);
-    free(*strip_s);
+    free(*&strip_s);
 }
 
 static inline void trim(char **s) {

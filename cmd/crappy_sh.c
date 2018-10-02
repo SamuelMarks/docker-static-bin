@@ -12,21 +12,7 @@
 
 #include <version.h>
 #include "../lib/shell.c"
-
-static inline void parse_cli(int, char *[], const bool **, const bool **, const char **,
-                             const char **, const char **, const char **);
-
-static inline void usage_and_exit(const char *);
-
-static inline int get_clock_val(struct tm, char);
-
-static inline void resolve_env_vars(const char **);
-
-static inline bool has_env_var(const char **);
-
-char *repl_str(const char *, const char *, const char *);
-
-static inline void prepend(char *, const char *);
+#include "crappy_sh.h"
 
 int main(int argc, char *argv[]) {
     const char *sleep = "", *modulos /* --time */= "", *time_unit = "", *command = "";
@@ -34,54 +20,11 @@ int main(int argc, char *argv[]) {
 
     parse_cli(argc, argv, &verbose, &env, &sleep, &modulos /* --time */, &time_unit, &command);
 
-    if (strlen(modulos) + strlen(time_unit) > 0)
-        for (time_t epoch;;) {
-            epoch = time(NULL);
-            struct tm timeinfo = *gmtime(&epoch);
-            int mod = (int) strtol(modulos, NULL, 10);
-            if (!mod) mod = 10;
+    handle_time_delay(&verbose, &sleep, &modulos, &time_unit);
 
-            const int clock_val = get_clock_val(timeinfo, time_unit[0]);
+    handle_env_vars(&verbose, &env, &command);
 
-            if (verbose)
-                printf("Waiting for %d %ss %% %d to be 0, currently %d != 0\n",
-                       clock_val, time_unit, mod, clock_val % mod);
-            if (clock_val % mod == 0)
-                break;
-            else if (strlen(sleep) > 0) {
-                if (verbose)
-                    printf("Sleeping for %s\n", sleep);
-                usleep((useconds_t) strtol(sleep, NULL, 10));
-            }
-        }
-
-    if (env) {
-        if (verbose)
-            printf("command before expansion of environment variables:\t\"%s\"\n", command);
-
-        do resolve_env_vars(&command);
-        while (has_env_var(&command));
-
-        if (verbose)
-            printf("command after expansion of environment variables:\t\"%s\"\n", command);
-    }
-
-    if (strlen(command))
-        return processInput(command, verbose).return_code;
-}
-
-static inline int get_clock_val(struct tm timeinfo, const char c) {
-    switch (c) {
-        case 'h':
-            return timeinfo.tm_hour;
-        case 'm':
-        minute:
-            return timeinfo.tm_min;
-        case 's':
-            return timeinfo.tm_sec;
-        default:
-            goto minute;
-    }
+    return strlen(command) ? processInput(command, verbose).return_code : EXIT_SUCCESS;
 }
 
 static inline void parse_cli(int argc, char *argv[],
@@ -148,96 +91,18 @@ static inline void usage_and_exit(const char *argv0) {
     exit(EXIT_FAILURE);
 }
 
-
-/* stolen from https://creativeandcritical.net/str-replace-c */
-char *repl_str(const char *str, const char *from, const char *to) {
-    /* Adjust each of the below values to suit your needs. */
-
-    /* Increment positions cache size initially by this number. */
-    size_t cache_sz_inc = 16;
-    /* Thereafter, each time capacity needs to be increased,
-     * multiply the increment by this factor. */
-    const size_t cache_sz_inc_factor = 3;
-    /* But never increment capacity by more than this number. */
-    const size_t cache_sz_inc_max = 1048576;
-
-    char *pret, *ret = NULL;
-    const char *pstr2, *pstr = str;
-    size_t i, count = 0;
-#if (__STDC_VERSION__ >= 199901L)
-    uintptr_t *pos_cache_tmp, *pos_cache = NULL;
-#else
-    ptrdiff_t *pos_cache_tmp, *pos_cache = NULL;
-#endif
-    size_t cache_sz = 0;
-    size_t cpylen, orglen, retlen, tolen, fromlen = strlen(from);
-
-    /* Find all matches and cache their positions. */
-    while ((pstr2 = strstr(pstr, from)) != NULL) {
-        count++;
-
-        /* Increase the cache size when necessary. */
-        if (cache_sz < count) {
-            cache_sz += cache_sz_inc;
-            pos_cache_tmp = realloc(pos_cache, sizeof(*pos_cache) * cache_sz);
-            if (pos_cache_tmp == NULL) {
-                goto end_repl_str;
-            } else pos_cache = pos_cache_tmp;
-            cache_sz_inc *= cache_sz_inc_factor;
-            if (cache_sz_inc > cache_sz_inc_max) {
-                cache_sz_inc = cache_sz_inc_max;
-            }
-        }
-
-        pos_cache[count - 1] = pstr2 - str;
-        pstr = pstr2 + fromlen;
+static inline int get_clock_val(struct tm timeinfo, const char c) {
+    switch (c) {
+        case 'h':
+            return timeinfo.tm_hour;
+        case 'm':
+        minute:
+            return timeinfo.tm_min;
+        case 's':
+            return timeinfo.tm_sec;
+        default:
+            goto minute;
     }
-
-    orglen = pstr - str + strlen(pstr);
-
-    /* Allocate memory for the post-replacement string. */
-    if (count > 0) {
-        tolen = strlen(to);
-        retlen = orglen + (tolen - fromlen) * count;
-    } else retlen = orglen;
-    ret = malloc(retlen + 1);
-    if (ret == NULL)
-        goto end_repl_str;
-
-    if (count == 0)
-        /* If no matches, then just duplicate the string. */
-        strcpy(ret, str);
-    else {
-        /* Otherwise, duplicate the string whilst performing
-         * the replacements using the position cache. */
-        pret = ret;
-        memcpy(pret, str, pos_cache[0]);
-        pret += pos_cache[0];
-        for (i = 0; i < count; i++) {
-            memcpy(pret, to, tolen);
-            pret += tolen;
-            pstr = str + pos_cache[i] + fromlen;
-            cpylen = (i == count - 1 ? orglen : pos_cache[i + 1]) - pos_cache[i] - fromlen;
-            memcpy(pret, pstr, cpylen);
-            pret += cpylen;
-        }
-        ret[retlen] = '\0';
-    }
-
-    end_repl_str:
-    /* Free the cache and return the post-replacement string,
-     * which will be NULL in the event of an error. */
-    free(pos_cache);
-    return ret;
-}
-
-static inline void prepend(char *s, const char *t) {
-    const size_t len = strlen(t);
-
-    memmove(s + len, s, strlen(s) + 1);
-
-    for (size_t i = 0; i < len; ++i)
-        s[i] = t[i];
 }
 
 static inline void resolve_env_vars(const char **command) {
@@ -360,6 +225,134 @@ static inline bool has_env_var(const char **command) {
                 break;
         }
     return false;
+}
+
+static inline void prepend(char *s, const char *t) {
+    const size_t len = strlen(t);
+
+    memmove(s + len, s, strlen(s) + 1);
+
+    for (size_t i = 0; i < len; ++i)
+        s[i] = t[i];
+}
+
+/* stolen from https://creativeandcritical.net/str-replace-c */
+char *repl_str(const char *str, const char *from, const char *to) {
+    /* Adjust each of the below values to suit your needs. */
+
+    /* Increment positions cache size initially by this number. */
+    size_t cache_sz_inc = 16;
+    /* Thereafter, each time capacity needs to be increased,
+     * multiply the increment by this factor. */
+    const size_t cache_sz_inc_factor = 3;
+    /* But never increment capacity by more than this number. */
+    const size_t cache_sz_inc_max = 1048576;
+
+    char *pret, *ret = NULL;
+    const char *pstr2, *pstr = str;
+    size_t i, count = 0;
+#if (__STDC_VERSION__ >= 199901L)
+    uintptr_t *pos_cache_tmp, *pos_cache = NULL;
+#else
+    ptrdiff_t *pos_cache_tmp, *pos_cache = NULL;
+#endif
+    size_t cache_sz = 0;
+    size_t cpylen, orglen, retlen, tolen, fromlen = strlen(from);
+
+    /* Find all matches and cache their positions. */
+    while ((pstr2 = strstr(pstr, from)) != NULL) {
+        count++;
+
+        /* Increase the cache size when necessary. */
+        if (cache_sz < count) {
+            cache_sz += cache_sz_inc;
+            pos_cache_tmp = realloc(pos_cache, sizeof(*pos_cache) * cache_sz);
+            if (pos_cache_tmp == NULL) {
+                goto end_repl_str;
+            } else pos_cache = pos_cache_tmp;
+            cache_sz_inc *= cache_sz_inc_factor;
+            if (cache_sz_inc > cache_sz_inc_max) {
+                cache_sz_inc = cache_sz_inc_max;
+            }
+        }
+
+        pos_cache[count - 1] = pstr2 - str;
+        pstr = pstr2 + fromlen;
+    }
+
+    orglen = pstr - str + strlen(pstr);
+
+    /* Allocate memory for the post-replacement string. */
+    if (count > 0) {
+        tolen = strlen(to);
+        retlen = orglen + (tolen - fromlen) * count;
+    } else retlen = orglen;
+    ret = malloc(retlen + 1);
+    if (ret == NULL)
+        goto end_repl_str;
+
+    if (count == 0)
+        /* If no matches, then just duplicate the string. */
+        strcpy(ret, str);
+    else {
+        /* Otherwise, duplicate the string whilst performing
+         * the replacements using the position cache. */
+        pret = ret;
+        memcpy(pret, str, pos_cache[0]);
+        pret += pos_cache[0];
+        for (i = 0; i < count; i++) {
+            memcpy(pret, to, tolen);
+            pret += tolen;
+            pstr = str + pos_cache[i] + fromlen;
+            cpylen = (i == count - 1 ? orglen : pos_cache[i + 1]) - pos_cache[i] - fromlen;
+            memcpy(pret, pstr, cpylen);
+            pret += cpylen;
+        }
+        ret[retlen] = '\0';
+    }
+
+    end_repl_str:
+    /* Free the cache and return the post-replacement string,
+     * which will be NULL in the event of an error. */
+    free(pos_cache);
+    return ret;
+}
+
+static inline void handle_time_delay(const bool **verbose, const char **sleep,
+                                     const char **modulos, const char **time_unit) {
+    if (strlen(*modulos) + strlen(*time_unit) > 0) {
+        puts("true time delay");
+        for (time_t epoch;;) {
+            epoch = time(NULL);
+            struct tm timeinfo = *gmtime(&epoch);
+            int mod = (int) strtol(*modulos, NULL, 10);
+            if (!mod) mod = 10;
+
+            const int clock_val = get_clock_val(timeinfo, (*time_unit)[0]);
+
+            if (verbose)
+                printf("Waiting for %d %ss %% %d to be 0, currently %d != 0\n",
+                       clock_val, *time_unit, mod, clock_val % mod);
+            if (clock_val % mod == 0)
+                break;
+            else if (strlen(*sleep) > 0) {
+                if (verbose)
+                    printf("Sleeping for %s\n", *sleep);
+                usleep((useconds_t) strtol(*sleep, NULL, 10));
+            }
+        }
+    }
+}
+
+static inline void handle_env_vars(const bool **verbose, const bool **env, const char **command) {
+    if (*env) {
+        *verbose && printf("command before expansion of environment variables:\t\"%s\"\n", *command);
+
+        do resolve_env_vars(*&command);
+        while (has_env_var(*&command));
+
+        *verbose && printf("command after expansion of environment variables:\t\"%s\"\n", *command);
+    }
 }
 
 #endif /* CRAPPY_SH */

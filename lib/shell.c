@@ -302,7 +302,7 @@ static inline PidCode run_command(const char *sbuf, const bool verbose) {
 const PidCode processInput(const char *in, const bool verbose) {
     const size_t slen = strlen(in);
     char sbuf[slen];
-    PidCode last_pid_code = pid_code_nulled;
+    PidCode last_pid_code;
 
     for (size_t i = 0, cur = 0; i < slen; i++) {
         switch (in[i]) {
@@ -329,6 +329,7 @@ const PidCode processInput(const char *in, const bool verbose) {
                 }
             end:
                 last_pid_code = run_command(sbuf, verbose);
+                if (last_pid_code.return_code != EXIT_SUCCESS) goto bad_code;
                 cur = 0;
                 memset(sbuf, 0, slen);
                 break;
@@ -343,10 +344,13 @@ const PidCode processInput(const char *in, const bool verbose) {
         }
     }
 
-    const PidCode pid0 = run_command(sbuf, verbose);
-    if (!pid0.return_code)
-        return last_pid_code;
-    return pid0;
+    last_pid_code = run_command(sbuf, verbose);
+    if (last_pid_code.return_code != EXIT_SUCCESS) goto bad_code;
+    return last_pid_code;
+
+    bad_code:
+    fprintf(stderr, "Non-zero exit code from PID %d, with: \"%s\"\n", last_pid_code.pid, sbuf);
+    return last_pid_code;
 }
 
 #endif /* SHELL */
