@@ -14,3 +14,9 @@ Very small C sources implementing a few commands need in a `FROM scratch`
     conan install ..
     cmake -DCMAKE_BUILD_TYPE=Debug ..
     make
+
+## Run tests
+
+Starting from directory created above, after `make` step, run:
+
+    ./bin/test_*
